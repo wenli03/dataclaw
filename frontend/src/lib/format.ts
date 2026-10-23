@@ -82,6 +82,8 @@ export const riskColor: Record<string, string> = {
   high: "text-rose-600 bg-rose-50 border-rose-100",
 };
 
+export const riskLabel: Record<string, string> = { low: "低风险", medium: "中风险", high: "高风险" };
+
 export function riskBadgeClass(risk?: string): string {
   return `${riskColor[risk || "low"] || riskColor.low} whitespace-nowrap`;
 }
