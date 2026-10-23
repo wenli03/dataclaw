@@ -13,3 +13,6 @@ frontend/dist/
 *.log
 frontend/src/**/*.js
 frontend/src/**/*.js.map
+lean/data/
+lean/*.exe
+lean/boot.json

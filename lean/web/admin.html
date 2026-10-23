@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DataClaw · 管理后台</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="side">
+    <div class="brand"><span class="logo-dot">D</span><div><b>DataClaw</b><small>企业级数字员工平台</small></div></div>
+    <div class="side-note"><b>管理员视角</b><small>统一定义 · 权限 · 审计</small></div>
+    <nav>
+      <a href="#" class="nav on" data-tab="overview">运营总览</a>
+      <a href="#" class="nav" data-tab="agents">公共员工</a>
+      <a href="#" class="nav" data-tab="data">数据安全</a>
+      <a href="#" class="nav" data-tab="knowledge">知识中台</a>
+      <a href="#" class="nav" data-tab="audit">审计日志</a>
+      <a href="/app" class="nav">返回工作台</a>
+    </nav>
+    <div class="side-user">
+      <span class="avatar" id="me-avatar">·</span>
+      <div><b id="me-name">·</b><small id="me-role">·</small></div>
+      <button class="link" id="logout">退出</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <section id="tab-overview" class="view on">
+      <div class="page-head"><div><h2>运营总览 · 平台运行状态</h2><p class="muted">数字员工、会话、工具调用与风险拦截的实时画像。</p></div></div>
+      <div class="stats" id="stats"></div>
+      <div class="two">
+        <div class="card"><h3>近 7 日审计量</h3><div id="trend" style="height:260px"></div></div>
+        <div class="card"><h3>高风险 / 拦截</h3><div id="risk-box"></div></div>
+      </div>
+    </section>
+
+    <section id="tab-agents" class="view">
+      <div class="page-head"><div><h2>公共员工 · 统一定义，一键分配</h2><p class="muted">管理员维护 SOUL 与技能，按版本分发给业务用户；用户拿到带独立记忆的副本。</p></div></div>
+      <div class="cards" id="agent-cards"></div>
+    </section>
+
+    <section id="tab-data" class="view">
+      <div class="page-head"><div><h2>数据安全可控 · 统一数据应用权限管控</h2><p class="muted">数据源 → 表 → 字段 → 行级四级策略，配合脱敏与 SQL 改写。管理员在这里解释「为什么他看不到」。</p></div></div>
+      <div class="two">
+        <div class="card"><h3>访问策略</h3><div class="scroll" id="policy-table"></div>
+          <div class="policy-form">
+            <select id="pf-who"><option value="user:u_analyst">用户：林知微</option><option value="user:u_sales">用户：程景舟</option><option value="user:u_legal">用户：顾守正</option><option value="role:member">角色：普通成员</option></select>
+            <select id="pf-res"><option value="table:worktime_fact">表：worktime_fact</option><option value="table:crm_customer">表：crm_customer</option><option value="table:contract_clause">表：contract_clause</option><option value="column:worktime_fact.salary">列：salary</option><option value="column:worktime_fact.employee_name">列：employee_name</option></select>
+            <select id="pf-act"><option value="allow">allow</option><option value="deny">deny</option></select>
+            <select id="pf-mask"><option value="">不脱敏</option><option value="mask">掩码</option><option value="hash">哈希</option><option value="truncate">截断</option></select>
+            <input id="pf-row" placeholder="行级过滤 owner_id='u_sales'">
+            <button class="btn primary" id="pf-add">添加策略</button>
+          </div>
+        </div>
+        <div class="card"><h3>SQL 改写预览</h3>
+          <div class="muted tiny">以哪个身份预览：</div>
+          <select id="pv-as"><option value="u_analyst">analyst（分析师）</option><option value="u_sales">sales（销售）</option><option value="u_legal">legal（法务）</option><option value="u_admin">admin</option></select>
+          <textarea id="pv-sql" rows="4">select * from worktime_fact limit 5</textarea>
+          <button class="btn primary" id="pv-go">执行预览</button>
+          <div id="pv-out"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-knowledge" class="view">
+      <div class="page-head"><div><h2>知识中台</h2><p class="muted">企业制度、规则与方法论；检索遵守文档权限。</p></div></div>
+      <div class="two">
+        <div class="card"><h3>文档</h3><div id="docs"></div></div>
+        <div class="card"><h3>检索试验台</h3><input id="kn-q" placeholder="如：合同付款账期"><button class="btn primary" id="kn-go">检索</button><div id="kn-out"></div></div>
+      </div>
+    </section>
+
+    <section id="tab-audit" class="view">
+      <div class="page-head"><div><h2>审计日志 · 每一次动作都留痕</h2><p class="muted">登录、会话、工具调用、SQL 改写、导出、审批；越权拦截同样入账。</p></div>
+        <select id="au-result" class="inline"><option value="">全部结果</option><option value="denied">已拒绝</option><option value="success">成功</option></select></div>
+      <div class="card"><div class="scroll" id="audit-table"></div></div>
+    </section>
+  </main>
+</div>
+<div id="toast" class="toast" hidden></div>
+<script src="/static/echarts.min.js"></script>
+<script src="/static/admin.js"></script>
+</body>
+</html>

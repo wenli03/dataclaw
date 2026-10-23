@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DataClaw · 登录</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="login-body">
+<div class="login-wrap">
+  <section class="login-brand">
+    <div class="brand-line"><span class="logo-dot">D</span><b>DataClaw</b><small>企业级数字员工平台 · 精简版</small></div>
+    <h1>让企业零门槛拥有<br>全天候在线的<span>「数字员工」</span></h1>
+    <p>一句话出大屏、一句话出拜访指南、一句话审完合同。私有化部署、数据不出域、权限继承自你的账号。</p>
+    <div class="feat">
+      <div><b>物理 + 权限双隔离</b><small>每用户独立工作空间</small></div>
+      <div><b>知识中台底座</b><small>结构化 + 非结构化</small></div>
+      <div><b>对话即交付</b><small>真实产物，非聊天</small></div>
+    </div>
+    <footer>© 2026 DataClaw · Go 单二进制版</footer>
+  </section>
+
+  <section class="login-form">
+    <h2>登录工作台</h2>
+    <p class="muted">使用企业账号登录，权限将自动继承到你的数字员工</p>
+    <label>账号<input id="u" value="admin" autocomplete="username"></label>
+    <label>口令<input id="p" type="password" value="admin123" autocomplete="current-password"></label>
+    <button id="go" class="btn primary block">进入工作台</button>
+    <div class="demo">
+      <div class="muted center">演示账号（点击填充）</div>
+      <div class="demo-grid">
+        <button data-u="admin" data-p="admin123"><b>平台管理员</b><small>admin · 张明</small></button>
+        <button data-u="analyst" data-p="123456"><b>数据分析师</b><small>analyst · 林知微</small></button>
+        <button data-u="sales" data-p="123456"><b>销售经理</b><small>sales · 程景舟</small></button>
+        <button data-u="legal" data-p="123456"><b>法务顾问</b><small>legal · 顾守正</small></button>
+      </div>
+    </div>
+    <p class="muted tiny">演示数据均为模拟数据。生产部署对接企业 SSO/LDAP，数字员工权限严格继承绑定用户。</p>
+  </section>
+</div>
+<script>
+document.querySelectorAll('.demo-grid button').forEach(b => b.onclick = () => {
+  document.getElementById('u').value = b.dataset.u;
+  document.getElementById('p').value = b.dataset.p;
+});
+document.getElementById('go').onclick = async () => {
+  const btn = document.getElementById('go');
+  btn.disabled = true; btn.textContent = '登录中…';
+  const r = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: u.value.trim(), password: p.value }) });
+  if (r.ok) location.href = '/app';
+  else { const j = await r.json(); alert(j.error?.message || '登录失败'); btn.disabled = false; btn.textContent = '进入工作台'; }
+};
+document.addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('go').click(); });
+</script>
+</body>
+</html>

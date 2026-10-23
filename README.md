@@ -5,6 +5,16 @@
 
 ![version](https://img.shields.io/badge/version-v1.0.0-5B57E8) ![Python](https://img.shields.io/badge/Python-3.11+-3776AB) ![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688) ![React](https://img.shields.io/badge/React-18-61DAFB)
 
+## 两个实现（同一产品）
+
+| 版本 | 技术 | 代码量 | 启动 | 适合 |
+|---|---|---|---|---|
+| **v1.0 参考实现** | Python(FastAPI) + React/Vite/TS | 31,000 行 | `scriptsun.cmd`（3 步依赖安装） | 产品化、长期演进 |
+| **v1.1 精简实现** | **Go 单二进制 + 原生 Web** | **3,488 行（−89%）** | `scripts\lean.cmd`（双击即用） | 演示 / POC / 单机私有化 |
+
+> 精简实现把 25 张表压成单表文档存储、78 个 API 压到 19 个、React 换原生 JS，功能保留三条标杆场景 + 权限/审计/公共员工/技能/HITL。
+> 取舍与对比见 [docs/06-精简实现（Go单二进制）.md](docs/06-精简实现（Go单二进制）.md)。
+
 ## 交付物
 
 | 文件 | 内容 |
@@ -14,6 +24,7 @@
 | [docs/03-架构设计与API契约.md](docs/03-架构设计与API契约.md) | 架构、数据模型、权限求值、SQL 安全网关、Agent 运行时、SSE 协议、完整 REST API |
 | [docs/04-实现说明与验收.md](docs/04-实现说明与验收.md) | 实现清单、运行方式、验收证据（含 18 张截图）、已知限制与 V2 路线 |
 | [docs/05-演示与讲解脚本.md](docs/05-演示与讲解脚本.md) | 5 分钟演示时间轴、10 个可讲的架构决策、8 个高频追问与回答、演示雷区 |
+| [docs/06-精简实现（Go单二进制）.md](docs/06-精简实现（Go单二进制）.md) | v1.1：Go 单二进制实现、代码量对比（31k→3.5k）、砍掉了什么/保留了什么、取舍与代价、验证 |
 
 ## 快速开始
 

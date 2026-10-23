@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DataClaw · 工作台</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="side">
+    <div class="brand"><span class="logo-dot">D</span><div><b>DataClaw</b><small>企业级数字员工平台</small></div></div>
+    <div class="side-note"><b>私有化部署</b><small>沙箱隔离 · 数据不出域</small></div>
+    <nav>
+      <a href="#chat" class="nav on" data-view="chat">会话</a>
+      <a href="#employees" class="nav" data-view="employees">员工</a>
+      <a href="#skills" class="nav" data-view="skills">技能超市</a>
+      <a href="/admin" class="nav" id="nav-admin" hidden>管理后台</a>
+    </nav>
+    <div class="side-user">
+      <span class="avatar" id="me-avatar">·</span>
+      <div><b id="me-name">·</b><small id="me-role">·</small></div>
+      <button class="link" id="logout">退出</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <!-- 会话 -->
+    <section id="view-chat" class="view on">
+      <div class="chat-grid">
+        <div class="col-list">
+          <div class="list-head"><b>会话</b><button class="btn sm" id="new-session">新建</button></div>
+          <div class="emp-pick" id="emp-pick"></div>
+          <div class="sessions" id="sessions"></div>
+        </div>
+        <div class="col-chat">
+          <header class="chat-head" id="chat-head"></header>
+          <div class="msgs" id="msgs"></div>
+          <div class="composer">
+            <textarea id="input" rows="2" placeholder="向数字员工下达任务，例如：帮我分析下上季度各区域工时效率情况（Enter 发送 / Shift+Enter 换行）"></textarea>
+            <button class="btn primary" id="send">发送</button>
+            <div class="hint">数字员工将按你的数据权限调用工具，越权操作会被拦截并审计</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 员工 -->
+    <section id="view-employees" class="view">
+      <div class="page-head"><div><h2>数字员工</h2><p class="muted">基于角色模板一键创建，绑定技能与 SOUL 设定，权限继承自你的账号。</p></div>
+        <button class="btn primary" id="new-emp">+ 新建员工</button></div>
+      <div class="cards" id="emp-cards"></div>
+    </section>
+
+    <!-- 技能 -->
+    <section id="view-skills" class="view">
+      <div class="page-head"><div><h2>技能超市</h2><p class="muted">内置企业级技能开箱即用；未安装的技能，运行时不会注册对应工具。</p></div></div>
+      <div class="cards" id="skill-cards"></div>
+    </section>
+  </main>
+</div>
+
+<!-- 员工详情抽屉 -->
+<div class="drawer" id="drawer" hidden><div class="drawer-mask" data-close></div>
+  <div class="drawer-body" id="drawer-body"></div></div>
+<!-- 新建员工 -->
+<div class="modal" id="modal-emp" hidden><div class="modal-mask" data-close></div>
+  <div class="modal-body">
+    <h3>新建数字员工</h3>
+    <p class="muted">选择角色模板，或自定义 SOUL 与技能。</p>
+    <label>角色模板<select id="emp-tpl"></select></label>
+    <label>名称<input id="emp-name" placeholder="例如：工时效率分析师"></label>
+    <label>SOUL 设定<textarea id="emp-soul" rows="6" placeholder="你是谁、核心原则、输出规范…"></textarea></label>
+    <div class="row"><button class="btn ghost" data-close>取消</button><button class="btn primary" id="emp-save">创建</button></div>
+  </div></div>
+<!-- 审批 -->
+<div class="modal" id="modal-approve" hidden><div class="modal-mask"></div>
+  <div class="modal-body">
+    <h3>需要你的确认</h3>
+    <p class="muted">数字员工即将执行一项高风险动作，批准后才会继续。</p>
+    <div class="approve-box"><b id="ap-action">—</b><p id="ap-reason" class="muted"></p></div>
+    <div class="row"><button class="btn ghost" id="ap-no">拒绝并跳过</button><button class="btn primary" id="ap-yes">批准并继续</button></div>
+    <p class="tiny muted">批准后数字员工继续执行；拒绝则跳过该步骤并在回答中说明。审批记录会写入审计。</p>
+  </div></div>
+<div id="toast" class="toast" hidden></div>
+
+<script src="/static/echarts.min.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>
