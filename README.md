@@ -12,7 +12,8 @@
 | [docs/01-PRD.md](docs/01-PRD.md) | 产品需求文档：定位、角色、四座大山解法、能力清单、三大标杆场景验收 |
 | [docs/02-技术调研报告.md](docs/02-技术调研报告.md) | GitHub 开源生态调研：OpenClaw / Dify / Coze / RAGFlow / Bisheng / 沙箱 / SQL 权限 / 合同审查 / 渠道，选型结论 |
 | [docs/03-架构设计与API契约.md](docs/03-架构设计与API契约.md) | 架构、数据模型、权限求值、SQL 安全网关、Agent 运行时、SSE 协议、完整 REST API |
-| [docs/04-实现说明与验收.md](docs/04-实现说明与验收.md) | 实现清单、运行方式、验收证据（含截图） |
+| [docs/04-实现说明与验收.md](docs/04-实现说明与验收.md) | 实现清单、运行方式、验收证据（含 19 张截图）、已知限制与 V2 路线 |
+| [docs/05-演示与讲解脚本.md](docs/05-演示与讲解脚本.md) | 5 分钟演示时间轴、10 个可讲的架构决策、8 个高频追问与回答、演示雷区 |
 
 ## 快速开始
 
@@ -26,7 +27,7 @@ cd ../frontend && pnpm install && pnpm build
 # 3) 启动（单端口 8787，前后端同源）
 cd ../backend && python -m uvicorn app.main:app --host 127.0.0.1 --port 8787
 ```
-Windows 一键：双击 `scripts\run.cmd`（自动选 Python、自动构建前端）｜开发模式 `scripts\dev.cmd`｜重建演示数据 `scripts\seed.cmd --reset`
+Windows 一键：双击 `scripts\run.cmd`（自动选 Python、自动构建前端）｜开发模式 `scripts\dev.cmd`｜重建演示数据 `scripts\seed.cmd --reset`｜跑全部测试 `scripts\test.cmd`（23 个用例）
 
 打开 http://127.0.0.1:8787 ，演示账号：
 
