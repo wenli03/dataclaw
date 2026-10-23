@@ -1,0 +1,15 @@
+node_modules/
+__pycache__/
+*.pyc
+.pytest_cache/
+data/*.db
+data/*.db-*
+data/uploads/
+data/artifacts/
+data/workspaces/
+backend/app/static/
+frontend/dist/
+.env
+*.log
+frontend/src/**/*.js
+frontend/src/**/*.js.map

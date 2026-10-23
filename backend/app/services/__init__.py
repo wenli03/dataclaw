@@ -1,0 +1,78 @@
+"""领域服务包。
+
+导出约定：接口层也可直接从具体模块导入（如 `from ..services.employee_service import ...`）。
+"""
+
+from .assignment_service import (
+    agent_employee,
+    agent_visible,
+    assign_users,
+    list_assignments,
+    remove_assignment,
+    replace_skills,
+    sync_assignments,
+)
+from .employee_service import (
+    assert_employee_readable,
+    assert_employee_writable,
+    create_employee_from_template,
+    duplicate_employee,
+    employee_detail,
+    employee_for_skill_binding,
+    employee_memory,
+    employee_skills,
+    employee_stats,
+    employee_summaries,
+    get_employee_or_404,
+    list_employees,
+    replace_employee_skills,
+    upsert_employee_skill,
+)
+from .skill_service import (
+    can_bind_skill,
+    can_install,
+    installed_skill_ids,
+    parse_frontmatter,
+    resolve_skill_ids,
+    resolve_skills,
+    scan_skill_content,
+    serialize_skills,
+    skill_detail,
+    skill_item,
+    unique_skill_name,
+)
+
+__all__ = [
+    "agent_employee",
+    "agent_visible",
+    "assert_employee_readable",
+    "assert_employee_writable",
+    "assign_users",
+    "can_bind_skill",
+    "can_install",
+    "create_employee_from_template",
+    "duplicate_employee",
+    "employee_detail",
+    "employee_for_skill_binding",
+    "employee_memory",
+    "employee_skills",
+    "employee_stats",
+    "employee_summaries",
+    "get_employee_or_404",
+    "installed_skill_ids",
+    "list_assignments",
+    "list_employees",
+    "parse_frontmatter",
+    "resolve_skill_ids",
+    "resolve_skills",
+    "remove_assignment",
+    "replace_employee_skills",
+    "replace_skills",
+    "scan_skill_content",
+    "serialize_skills",
+    "skill_detail",
+    "skill_item",
+    "sync_assignments",
+    "unique_skill_name",
+    "upsert_employee_skill",
+]
