@@ -10,10 +10,11 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..core.config import DATA_DIR, REPO
-from ..models import ColumnMeta, DataSource, TableMeta, User
+from ..models import ColumnMeta, DataSource, Policy, TableMeta, User, new_id
 from . import policy_service
 
 SUPPORTED_TYPES = ("sqlite", "mysql", "pg", "hive", "excel", "bi")
+EXCEL_SUFFIXES = (".xlsx", ".xlsm")
 
 
 def resolve_path(ds: DataSource) -> Path:
@@ -77,6 +78,7 @@ def to_dict(ds: DataSource, db: Session | None = None) -> dict:
         "description": ds.description or "",
         "config": cfg,
         "path": str(resolve_path(ds)),
+        "sourcePath": str(cfg.get("sourcePath") or ""),
         "createdAt": ds.created_at.isoformat() + "Z" if ds.created_at else None,
         "updatedAt": ds.updated_at.isoformat() + "Z" if ds.updated_at else None,
     }
@@ -195,6 +197,142 @@ def columns_of(db: Session, user: User, ds: DataSource, table: str) -> dict:
     }
 
 
+# ---------------------------------------------------------------- Excel
+
+def _quote_ident(name: str) -> str:
+    """SQLite 标识符转义（工作表名允许中文与空格）。"""
+    return '"' + str(name).replace('"', '""') + '"'
+
+
+def _safe_ident(name: str, fallback: str) -> str:
+    raw = str(name or "").strip()
+    if not raw:
+        return fallback
+    # 保留中英文/数字/下划线，其余（空格、括号、斜杠）转下划线
+    cleaned = "".join(ch if (ch.isalnum() or ch == "_") else "_" for ch in raw)
+    cleaned = cleaned.strip("_")
+    return cleaned or fallback
+
+
+def _excel_value(v: Any) -> Any:
+    from datetime import date, datetime, time
+
+    if v is None or isinstance(v, (int, float, str)):
+        return v
+    if isinstance(v, bool):
+        return int(v)
+    if isinstance(v, (datetime, date, time)):
+        return v.isoformat()
+    return str(v)
+
+
+def _infer_type(values: list[Any]) -> str:
+    sample = [v for v in values if v is not None and str(v).strip() != ""][:80]
+    if not sample:
+        return "TEXT"
+    if all(isinstance(v, bool) for v in sample):
+        return "INTEGER"
+    if all(isinstance(v, int) and not isinstance(v, bool) for v in sample):
+        return "INTEGER"
+    if all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in sample):
+        return "REAL"
+    return "TEXT"
+
+
+def _classify_column(name: str) -> tuple[str, str]:
+    """按列名做轻量敏感识别：返回 (密级, 分类)。管理员仍可在策略里覆盖。"""
+    n = str(name or "").lower()
+    if any(k in n for k in ("身份证", "银行卡", "密码", "私钥", "社保")):
+        return "top_secret", "个人信息"
+    if any(k in n for k in ("薪资", "工资", "薪酬", "手机", "电话", "邮箱", "住址", "联系人")):
+        return "secret", "个人信息"
+    if any(k in n for k in ("金额", "成本", "利润", "营收", "合同额", "单价", "报价")):
+        return "internal", "财务"
+    if any(k in n for k in ("客户", "员工", "姓名", "负责人", "部门", "区域")):
+        return "internal", "业务"
+    return "public", "业务"
+
+
+def import_excel(source: Path, target: Path) -> list[dict]:
+    """把 Excel 各工作表导入为只读 SQLite 表，返回工作表摘要。
+
+    DataClaw 的网关只接受 SQLite 连接；Excel 作为「接入格式」先落成可审计的
+    本地只读库，后续表/列/行级策略、SQL 改写与脱敏全部复用同一套网关。
+    """
+    from openpyxl import load_workbook
+
+    wb = load_workbook(str(source), read_only=True, data_only=True)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if target.exists():
+        target.unlink()
+    conn = sqlite3.connect(str(target))
+    sheets: list[dict] = []
+    used_tables: set[str] = set()
+    try:
+        for idx, ws in enumerate(wb.worksheets, start=1):
+            rows = list(ws.iter_rows(values_only=True))
+            while rows and all(c is None or str(c).strip() == "" for c in rows[0]):
+                rows.pop(0)
+            if not rows:
+                continue
+            header = list(rows[0])
+            body = rows[1:]
+            # 表头补全 / 去重
+            columns: list[str] = []
+            seen: dict[str, int] = {}
+            for i, h in enumerate(header, start=1):
+                col = _safe_ident(h, f"列{i}")
+                seen[col] = seen.get(col, 0) + 1
+                if seen[col] > 1:
+                    col = f"{col}_{seen[col]}"
+                columns.append(col)
+            if not columns:
+                continue
+            table = _safe_ident(ws.title, f"Sheet{idx}")
+            base = table
+            n = 2
+            while table in used_tables:
+                table = f"{base}_{n}"
+                n += 1
+            used_tables.add(table)
+
+            types = [_infer_type([row[i] if i < len(row) else None for row in body]) for i in range(len(columns))]
+            ddl = ", ".join(f"{_quote_ident(c)} {t}" for c, t in zip(columns, types))
+            conn.execute(f"CREATE TABLE {_quote_ident(table)} ({ddl})")
+            placeholders = ", ".join("?" for _ in columns)
+            insert_sql = f"INSERT INTO {_quote_ident(table)} VALUES ({placeholders})"
+            payload = []
+            for row in body:
+                vals = [_excel_value(row[i] if i < len(row) else None) for i in range(len(columns))]
+                if all(v is None or str(v).strip() == "" for v in vals):
+                    continue
+                payload.append(vals)
+            if payload:
+                conn.executemany(insert_sql, payload)
+            sheets.append({
+                "table": table,
+                "sheet": ws.title,
+                "columns": len(columns),
+                "rows": len(payload),
+                "columnDefs": [{"name": c, "type": t} for c, t in zip(columns, types)],
+            })
+        conn.commit()
+    finally:
+        conn.close()
+        wb.close()
+    return sheets
+
+
+def _resolve_source_path(raw: str) -> Path:
+    p = Path(raw)
+    if p.is_absolute():
+        return p
+    for cand in (DATA_DIR / raw, REPO / raw, REPO / "data" / raw, Path.cwd() / raw):
+        if cand.exists():
+            return cand.resolve()
+    return (DATA_DIR / Path(raw).name).resolve()
+
+
 # ---------------------------------------------------------------- 连通性
 
 
@@ -208,7 +346,7 @@ def test_connection(db: Session, ds: DataSource) -> dict:
         "message": "",
     }
     try:
-        if ds.type == "sqlite":
+        if ds.type in ("sqlite", "excel"):
             path = resolve_path(ds)
             if not str(path) or not path.exists():
                 result["message"] = f"SQLite 文件不存在：{path}"
@@ -221,9 +359,10 @@ def test_connection(db: Session, ds: DataSource) -> dict:
                     ).fetchone()[0]
                 finally:
                     conn.close()
+                label = "Excel 导入库" if ds.type == "excel" else "SQLite"
                 result.update(
                     ok=bool(row and row[0] == 1),
-                    message=f"连接成功，共 {tables} 张表",
+                    message=f"{label}连接成功，共 {tables} 张表",
                     tableCount=int(tables),
                     path=str(path),
                 )
@@ -256,6 +395,7 @@ def create(db: Session, payload: dict, user: User) -> DataSource:
     if not name:
         raise ValueError("数据源名称不能为空")
     config = dict(payload.get("config") or {})
+    sheets: list[dict] = []
     if ds_type == "sqlite":
         path = str(config.get("path") or payload.get("database") or "").strip()
         if not path:
@@ -264,7 +404,36 @@ def create(db: Session, payload: dict, user: User) -> DataSource:
             config["path"] = path.replace("\\", "/")
         else:
             config["path"] = path
+    elif ds_type == "excel":
+        raw = str(config.get("path") or payload.get("database") or "").strip()
+        if not raw:
+            raise ValueError("Excel 数据源必须提供 .xlsx 文件路径（库名 / 路径）")
+        source = _resolve_source_path(raw)
+        if not source.exists():
+            raise ValueError(f"Excel 文件不存在：{source}")
+        if source.suffix.lower() not in EXCEL_SUFFIXES:
+            raise ValueError("Excel 数据源仅支持 .xlsx / .xlsm（.xls 请另存为 .xlsx）")
+        ds_id = new_id("ds")
+        target = DATA_DIR / f"excel_{ds_id}.db"
+        try:
+            sheets = import_excel(source, target)
+        except Exception:
+            target.unlink(missing_ok=True)
+            raise
+        if not sheets:
+            target.unlink(missing_ok=True)
+            raise ValueError("未在 Excel 中找到可导入的工作表（请确认首行为表头且至少有一行数据）")
+        config = {
+            "path": str(target),
+            "sourcePath": str(source),
+            "readonly": True,
+            "imported": True,
+            "sheets": sheets,
+        }
+    else:
+        ds_id = new_id("ds")
     ds = DataSource(
+        id=ds_id,
         name=name,
         type=ds_type,
         host=str(payload.get("host") or ""),
@@ -272,17 +441,57 @@ def create(db: Session, payload: dict, user: User) -> DataSource:
         database=str(payload.get("database") or ""),
         username=str(payload.get("username") or ""),
         config=config,
-        status="connected" if ds_type == "sqlite" else "error",
+        status="connected" if ds_type in ("sqlite", "excel") else "error",
         owner_id=user.id,
         description=str(payload.get("description") or ""),
     )
     db.add(ds)
+    db.flush()
+    if ds_type == "excel":
+        for sheet in sheets:
+            db.add(
+                TableMeta(
+                    datasource_id=ds.id,
+                    name=sheet["table"],
+                    comment=f"Excel 工作表：{sheet['sheet']}",
+                    row_count=int(sheet["rows"]),
+                )
+            )
+            for col in sheet.get("columnDefs") or []:
+                level, category = _classify_column(col["name"])
+                db.add(
+                    ColumnMeta(
+                        datasource_id=ds.id,
+                        table_name=sheet["table"],
+                        name=col["name"],
+                        type=col["type"],
+                        comment=f"来自 {Path(config['sourcePath']).name} / {sheet['sheet']}",
+                        sensitive_level=level,
+                        category=category,
+                    )
+                )
+        # 新数据源默认只有平台管理员可见，业务用户需显式配置 allow 策略。
+        db.add(
+            Policy(
+                id=new_id("pol"),
+                subject_type="role",
+                subject_id="platform_admin",
+                resource_type="datasource",
+                resource_id=ds.id,
+                action="allow",
+                priority=5,
+                enabled=True,
+                note="平台管理员：新接入数据源可见（业务用户需单独授权）",
+            )
+        )
     db.commit()
     db.refresh(ds)
     return ds
 
 
+
 __all__ = [
     "resolve_path", "demo_datasource", "get", "to_dict", "list_datasources",
-    "visible_tables", "columns_of", "test_connection", "create", "SUPPORTED_TYPES",
+    "visible_tables", "columns_of", "test_connection", "create", "import_excel",
+    "SUPPORTED_TYPES", "EXCEL_SUFFIXES",
 ]

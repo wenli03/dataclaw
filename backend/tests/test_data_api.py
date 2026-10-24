@@ -321,6 +321,52 @@ def test_overview_and_metrics() -> None:
           f"分级 secret={cls['totals']['secret']} top_secret={cls['totals']['top_secret']}")
 
 
+def test_excel_datasource_import() -> None:
+    """Excel 数据源：导入为只读 SQLite → 元数据/敏感识别 → 网关脱敏可查。"""
+    from urllib.parse import quote
+
+    from openpyxl import Workbook
+
+    xlsx = Path(os.environ["DATACLAW_DATA_DIR"]) / "工时样例.xlsx"
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "工时明细"
+    ws.append(["区域", "部门", "员工姓名", "工时", "薪资"])
+    ws.append(["华东", "研发", "张三", 160, 18000])
+    ws.append(["华南", "销售", "李四", 150, 15000])
+    wb.save(xlsx)
+
+    resp = client.post(
+        "/api/datasources",
+        json={"name": "Excel 样例", "type": "excel", "database": str(xlsx), "config": {"path": str(xlsx)}},
+        headers=H("admin"),
+    )
+    check(resp.status_code == 200, resp.text)
+    ds = resp.json()
+    check(ds["status"] == "connected", ds)
+    check(ds["test"]["ok"] is True, ds["test"])
+
+    tables = client.get(f"/api/datasources/{ds['id']}/tables", headers=H("admin")).json()
+    check(tables["total"] == 1 and tables["items"][0]["name"] == "工时明细", tables)
+    check("薪资" in tables["items"][0]["sensitiveColumns"], tables)
+
+    cols = client.get(
+        f"/api/datasources/{ds['id']}/tables/{quote('工时明细')}/columns", headers=H("admin")
+    ).json()
+    salary = next(c for c in cols["items"] if c["name"] == "薪资")
+    check(salary["sensitiveLevel"] == "secret" and salary["mask"] == "mask", salary)
+
+    preview = client.post(
+        "/api/policies/preview",
+        json={"datasourceId": ds["id"], "sql": 'select * from "工时明细"', "limit": 10},
+        headers=H("admin"),
+    ).json()
+    check(preview["ok"] is True, preview)
+    check(preview["maskedColumns"] == ["薪资"], preview)
+    check(all(r["薪资"] == "****" for r in preview["rows"]), preview["rows"])
+    print(f"  excel: {len(preview['rows'])} 行 / 脱敏 {preview['maskedColumns']}")
+
+
 def test_upload_parse_failure() -> None:
     """上传不支持的格式 → 400 中文提示；解析失败不静默成功。"""
     resp = client.post("/api/knowledge/docs",
@@ -345,6 +391,7 @@ TESTS = [
     test_knowledge_upload_search_acl,
     test_channels_and_inbound,
     test_overview_and_metrics,
+    test_excel_datasource_import,
     test_upload_parse_failure,
 ]
 

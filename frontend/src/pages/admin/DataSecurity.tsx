@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   ChevronDown,
@@ -426,6 +426,8 @@ export default function DataSecurity() {
   const [previewResult, setPreviewResult] = useState<PreviewResult | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  /** 首屏只自动选一次默认身份；之后用户选「以当前账号身份」（空值）不能被重置。 */
+  const identityInitRef = useRef(false);
 
   /* 分级统计 */
   const [classify, setClassify] = useState<ReturnType<typeof normalizeClassifications> | null>(null);
@@ -524,12 +526,15 @@ export default function DataSecurity() {
   }, [tab, classify, classifyLoading, loadClassify]);
 
   useEffect(() => {
-    if (!users.length) return;
+    if (!users.length || identityInitRef.current) return;
+    identityInitRef.current = true;
     // 默认落在 analyst：这是演示「行级过滤 + salary 掩码 + employee_name 哈希」的主角
     const preferred = users.find((u) => u.username === "analyst") ?? users[0];
     if (!effUserId) setEffUserId(preferred.id);
     if (!previewUserId) setPreviewUserId(preferred.id);
-  }, [users, effUserId, previewUserId]);
+    // 只在用户列表首次到达时初始化；后续允许选择空值（以当前账号身份）
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [users]);
 
   /* ---------------- 字段展开 ---------------- */
 

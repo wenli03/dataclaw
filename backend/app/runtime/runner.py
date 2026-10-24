@@ -564,6 +564,11 @@ async def _execute(
             tokens=tokens,
             latency_ms=latency,
         )
+        # 「教会即记住」：显式偏好即时落记忆；成功场景沉淀一条可复用的打法。
+        try:
+            _auto_memorize(db, employee, session, content, scenario, trace, artifacts_public)
+        except Exception:
+            db.rollback()
         result_meta.update(
             {
                 "content": final_text,
@@ -624,6 +629,51 @@ def _persist_assistant(db, *, session, message_id, content, trace, artifacts, to
     except Exception:
         pass
     db.commit()
+
+
+def _auto_memorize(db, employee, session, content, scenario, trace, artifacts) -> None:
+    """把一次对话沉淀成用户级记忆（按员工隔离）。
+
+    - 用户明确说「记住 / 以后 / 默认 / 偏好」→ 存一条 preference；
+    - 成功跑完标杆场景 → 每个场景只保留一条 playbook（工具链 + 交付物），
+      避免把每次提问都写进记忆。
+    """
+    if employee is None or not getattr(employee, "memory_enabled", True):
+        return
+    from ..models import Memory
+
+    added = 0
+    text = (content or "").strip()
+    triggers = ("记住", "以后", "默认", "偏好", "习惯", "不要", "必须", "叫我", "我是")
+    if len(text) <= 300 and any(k in text for k in triggers):
+        exists = (
+            db.query(Memory)
+            .filter(Memory.employee_id == employee.id, Memory.content == text)
+            .first()
+        )
+        if exists is None:
+            db.add(Memory(employee_id=employee.id, kind="preference", content=text, source_session_id=session.id))
+            added += 1
+
+    scenario_label = {"worktime": "工时分析", "sales": "销售拜访", "contract": "合同审查"}.get(scenario)
+    tool_steps = [t for t in trace if t.get("type") == "tool_result" and t.get("status") == "done"]
+    if scenario_label and tool_steps:
+        marker = f"任务打法（{scenario_label}）"
+        exists = (
+            db.query(Memory)
+            .filter(Memory.employee_id == employee.id, Memory.kind == "playbook", Memory.content.like(marker + "%"))
+            .first()
+        )
+        if exists is None:
+            tools = "、".join(dict.fromkeys(str(t.get("tool") or "") for t in tool_steps if t.get("tool")))
+            kinds = "、".join(dict.fromkeys(str(a.get("kind") or "") for a in artifacts if a.get("kind")))
+            summary = _make_title(text)
+            body = f"{marker}：任务「{summary}」；工具链：{tools or '未记录'}；交付：{kinds or '文本结果'}。"
+            db.add(Memory(employee_id=employee.id, kind="playbook", content=body, source_session_id=session.id))
+            added += 1
+
+    if added:
+        db.commit()
 
 
 def _trim_step(step: dict) -> dict:
